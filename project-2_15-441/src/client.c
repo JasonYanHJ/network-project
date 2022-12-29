@@ -18,37 +18,53 @@
 
 #include "cmu_tcp.h"
 
-void functionality(cmu_socket_t *sock) {
-  uint8_t buf[9898];
+#define BUF_SIZE (2 * 1024 * 1024 + 3)
+
+uint8_t buf[BUF_SIZE];
+
+void functionality(cmu_socket_t *sock, int index) {
   int read;
   FILE *fp;
 
-  cmu_write(sock, "hi there", 8);
-  cmu_write(sock, " https://www.youtube.com/watch?v=dQw4w9WgXcQ", 44);
-  cmu_write(sock, " https://www.youtube.com/watch?v=Yb6dZ1IFlKc", 44);
-  cmu_write(sock, " https://www.youtube.com/watch?v=xvFZjo5PgG0", 44);
-  cmu_write(sock, " https://www.youtube.com/watch?v=8ybW48rKBME", 44);
-  cmu_write(sock, " https://www.youtube.com/watch?v=xfr64zoBTAQ", 45);
-  cmu_read(sock, buf, 200, NO_FLAG);
 
-  cmu_write(sock, "hi there", 9);
-  cmu_read(sock, buf, 200, NO_FLAG);
-  printf("R: %s\n", buf);
-
-  read = cmu_read(sock, buf, 200, NO_WAIT);
-  printf("Read: %d\n", read);
-
-  fp = fopen("/vagrant/project-2_15-441/src/cmu_tcp.c", "rb");
-  read = 1;
-  while (read > 0) {
-    read = fread(buf, 1, 2000, fp);
-    if (read > 0) {
-      cmu_write(sock, buf, read);
-    }
+  switch (index) {
+    case 1:
+      fp = fopen("/vagrant/project-2_15-441/test_files/1_512B.txt", "rb");
+      read = fread(buf, 1, 513, fp);
+      break;
+    case 2:
+      fp = fopen("/vagrant/project-2_15-441/test_files/2_4KB.txt", "rb");
+      read = fread(buf, 1, 4097, fp);
+      break;
+    case 3:
+      fp = fopen("/vagrant/project-2_15-441/test_files/3_32KB.txt", "rb");
+      read = fread(buf, 1, 32769, fp);
+      break;
+    case 4:
+      fp = fopen("/vagrant/project-2_15-441/test_files/4_256KB.txt", "rb");
+      read = fread(buf, 1, 262145, fp);
+      break;
+    case 5:
+      fp = fopen("/vagrant/project-2_15-441/test_files/5_2MB.txt", "rb");
+      read = fread(buf, 1, 2097153, fp);
+      break;
   }
+  
+  printf("read %d byte\n", read);
+  cmu_write(sock, buf, read);
 }
 
-int main() {
+int main(int argc, char const *argv[]) {
+  if (argc < 2)  {
+    printf("usage: ./client [1-5]\n\
+            1: 512B file\n\
+            2: 4KB file\n\
+            3: 32KB file\n\
+            4: 256KB file\n\
+            5: 2MB file\n");
+    exit(EXIT_FAILURE);
+  }
+
   int portno;
   char *serverip;
   char *serverport;
@@ -69,7 +85,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  functionality(&socket);
+  functionality(&socket, atoi(argv[1]));
 
   if (cmu_close(&socket) < 0) {
     exit(EXIT_FAILURE);

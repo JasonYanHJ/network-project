@@ -186,7 +186,7 @@ void single_send(cmu_socket_t *sock, uint8_t *data, int buf_len) {
   int sockfd = sock->socket;
   if (buf_len > 0) {
     while (buf_len != 0) {
-      uint16_t payload_len = MIN((uint16_t)buf_len, (uint16_t)MSS);
+      uint16_t payload_len = MIN(buf_len, (uint16_t)MSS);
 
       uint16_t src = sock->my_port;
       uint16_t dst = ntohs(sock->conn.sin_port);

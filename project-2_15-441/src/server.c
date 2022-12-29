@@ -19,8 +19,9 @@
 
 #include "cmu_tcp.h"
 
-#define BUF_SIZE 10000
+#define BUF_SIZE (2 * 1024 * 1024 + 3)
 
+uint8_t buf[BUF_SIZE];
 /*
  * Param: sock - used for reading and writing to a connection
  *
@@ -28,29 +29,37 @@
  *  the sockets will be used.
  *
  */
-void functionality(cmu_socket_t *sock) {
-  uint8_t buf[BUF_SIZE];
+void functionality(cmu_socket_t *sock, int index) {
   FILE *fp;
+  int read = 0, to_read = 512;
   int n;
 
-  n = cmu_read(sock, buf, BUF_SIZE, NO_FLAG);
-  printf("R: %s\n", buf);
-  printf("N: %d\n", n);
-  cmu_write(sock, "hi there", 9);
-  n = cmu_read(sock, buf, 200, NO_FLAG);
-  printf("R: %s\n", buf);
-  printf("N: %d\n", n);
-  cmu_write(sock, "https://www.youtube.com/watch?v=dQw4w9WgXcQ", 44);
-
-  sleep(1);
-  n = cmu_read(sock, buf, BUF_SIZE, NO_FLAG);
-  printf("N: %d\n", n);
   fp = fopen("/tmp/file.c", "w");
-  fwrite(buf, 1, n, fp);
+  for (int i = 1; i < index; i++)
+    to_read *= 8;
+
+  while (read < to_read) {
+    n = cmu_read(sock, buf, BUF_SIZE, NO_WAIT);
+    if (n > 0) {
+      printf("N: %d\n", n);
+      fwrite(buf, 1, n, fp);
+    }
+    read += n;
+  }
+  printf("total read: %d\n", read);
   fclose(fp);
 }
 
-int main() {
+int main(int argc, char const *argv[]) {
+  if (argc < 2)  {
+    printf("usage: ./server [1-5]\n\
+            1: 512B file\n\
+            2: 4KB file\n\
+            3: 32KB file\n\
+            4: 256KB file\n\
+            5: 2MB file\n");
+    exit(EXIT_FAILURE);
+  }
   int portno;
   char *serverip;
   char *serverport;
@@ -71,7 +80,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  functionality(&socket);
+  functionality(&socket, atoi(argv[1]));
 
   if (cmu_close(&socket) < 0) {
     exit(EXIT_FAILURE);
