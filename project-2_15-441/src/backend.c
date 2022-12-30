@@ -75,9 +75,10 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt) {
 
   if (get_payload_len(pkt) == 0)
     return;
+  if (get_seq(hdr) != sock->window.next_seq_expected)
+    return;
   
   socklen_t conn_len = sizeof(sock->conn);
-  uint32_t seq = sock->window.last_ack_received;
 
   // No payload.
   uint8_t *payload = NULL;
@@ -89,6 +90,7 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt) {
 
   uint16_t src = sock->my_port;
   uint16_t dst = ntohs(sock->conn.sin_port);
+  uint32_t seq = sock->window.last_ack_received;
   uint32_t ack = get_seq(hdr) + get_payload_len(pkt);
   uint16_t hlen = sizeof(cmu_tcp_header_t);
   uint16_t plen = hlen + payload_len;
@@ -102,19 +104,16 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt) {
           (struct sockaddr *)&(sock->conn), conn_len);
   free(response_packet);
 
-  seq = get_seq(hdr);
+  
+  sock->window.next_seq_expected = get_seq(hdr) + get_payload_len(pkt);
+  payload_len = get_payload_len(pkt);
+  payload = get_payload(pkt);
 
-  if (seq == sock->window.next_seq_expected) {
-    sock->window.next_seq_expected = seq + get_payload_len(pkt);
-    payload_len = get_payload_len(pkt);
-    payload = get_payload(pkt);
-
-    // Make sure there is enough space in the buffer to store the payload.
-    sock->received_buf =
-        realloc(sock->received_buf, sock->received_len + payload_len);
-    memcpy(sock->received_buf + sock->received_len, payload, payload_len);
-    sock->received_len += payload_len;
-  }
+  // Make sure there is enough space in the buffer to store the payload.
+  sock->received_buf =
+      realloc(sock->received_buf, sock->received_len + payload_len);
+  memcpy(sock->received_buf + sock->received_len, payload, payload_len);
+  sock->received_len += payload_len;
 }
 
 /**
@@ -324,7 +323,7 @@ void send_SYN_ACK(cmu_socket_t *sock) {
   struct pollfd ack_fd;
   ack_fd.fd = sock->socket;
   ack_fd.events = POLLIN;
-  // Timeout after 3 seconds.
+  // Timeout after RTT * 2.
   while (poll(&ack_fd, 1, rtt_in_ms(sock->rtt) * 2) == 0) {
     sendto(sock->socket, SYN_ACK_packet, plen, 0,
           (struct sockaddr *)&(sock->conn), conn_len);
