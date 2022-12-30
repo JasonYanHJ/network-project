@@ -125,8 +125,10 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt) {
  * @param sock The socket used for receiving data on the connection.
  * @param flags Flags that determine how the socket should wait for data. Check
  *             `cmu_read_mode_t` for more information.
+ * 
+ * @return -1 when flags = TIMEOUT and timeout
  */
-void check_for_data(cmu_socket_t *sock, cmu_read_mode_t flags) {
+int check_for_data(cmu_socket_t *sock, cmu_read_mode_t flags) {
   cmu_tcp_header_t hdr;
   uint8_t *pkt;
   socklen_t conn_len = sizeof(sock->conn);
@@ -147,7 +149,8 @@ void check_for_data(cmu_socket_t *sock, cmu_read_mode_t flags) {
       ack_fd.events = POLLIN;
       // Timeout after RTT * 2.
       if (poll(&ack_fd, 1, rtt_in_ms(sock->rtt) * 2) <= 0) {
-        break;
+        pthread_mutex_unlock(&(sock->recv_lock));
+        return -1;
       }
     }
     // Fallthrough.
@@ -171,6 +174,7 @@ void check_for_data(cmu_socket_t *sock, cmu_read_mode_t flags) {
     free(pkt);
   }
   pthread_mutex_unlock(&(sock->recv_lock));
+  return 0;
 }
 
 /**
@@ -232,8 +236,11 @@ void multi_send(cmu_socket_t *sock, uint8_t *data, int buf_len) {
 
     // check the ack pkts
     for (int i = 0; i < unack_pkt_cnt; i++) {
-      check_for_data(sock, TIMEOUT);
-      
+      int is_timeout = check_for_data(sock, TIMEOUT);
+      if (is_timeout) {
+        printf("timeout waiting for ack\n");
+        break;
+      }
       // when successfully receiving the ack pkt of the first sending pkt
       // end the timer
       if (i == 0 && has_been_acked(sock, ack_before_send)) {
