@@ -24,9 +24,11 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 #include "cmu_packet.h"
 #include "cmu_tcp.h"
+#include "rtt_estimator.h"
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MIN3(X, Y, Z) MIN(MIN(X, Y), Z)
@@ -144,8 +146,8 @@ void check_for_data(cmu_socket_t *sock, cmu_read_mode_t flags) {
       struct pollfd ack_fd;
       ack_fd.fd = sock->socket;
       ack_fd.events = POLLIN;
-      // Timeout after 3 seconds.
-      if (poll(&ack_fd, 1, 3000) <= 0) {
+      // Timeout after RTT * 2.
+      if (poll(&ack_fd, 1, rtt_in_ms(sock->rtt) * 2) <= 0) {
         break;
       }
     }
@@ -194,6 +196,12 @@ void multi_send(cmu_socket_t *sock, uint8_t *data, int buf_len) {
     int unack_pkt_cnt = 0;
     uint32_t written_cnt = 0;
     uint32_t ack_before_send = sock->window.last_ack_received;
+    struct timeval start_time, end_time;
+    int has_recorded_end_time = 0;
+
+    gettimeofday(&start_time, NULL);
+
+    // send a window of pkts
     while (
             written_cnt < (uint32_t)buf_len && 
             written_cnt < WINDOW_INITIAL_WINDOW_SIZE
@@ -223,10 +231,29 @@ void multi_send(cmu_socket_t *sock, uint8_t *data, int buf_len) {
       unack_pkt_cnt++;
     }
 
+    // check the ack pkts
     for (int i = 0; i < unack_pkt_cnt; i++) {
       check_for_data(sock, TIMEOUT);
+      
+      // when successfully receiving the ack pkt of the first sending pkt
+      // end the timer
+      if (i == 0 && has_been_acked(sock, ack_before_send)) {
+        gettimeofday(&end_time, NULL);
+        has_recorded_end_time = 1;
+      }
+
+      // if received the final ack pkt in advance (i != unack_pkt - 1)
+      // some of the in-between ack pkts were lost
+      // but it doesn't matter, just break
+      if (has_been_acked(sock, ack_before_send + written_cnt))
+        break;
     }
 
+    if (has_recorded_end_time) {
+      update_rtt(sock->rtt, &start_time, &end_time);
+    }
+
+    // move foward the window with successed_written_cnt bytes
     int successed_written_cnt = sock->window.last_ack_received - ack_before_send;
     buf_len -= successed_written_cnt;
     data_offset += successed_written_cnt;
@@ -298,7 +325,7 @@ void send_SYN_ACK(cmu_socket_t *sock) {
   ack_fd.fd = sock->socket;
   ack_fd.events = POLLIN;
   // Timeout after 3 seconds.
-  while (poll(&ack_fd, 1, 3000) == 0) {
+  while (poll(&ack_fd, 1, rtt_in_ms(sock->rtt) * 2) == 0) {
     sendto(sock->socket, SYN_ACK_packet, plen, 0,
           (struct sockaddr *)&(sock->conn), conn_len);
     printf("TIMEOUT resend SYN_ACK packet\n");

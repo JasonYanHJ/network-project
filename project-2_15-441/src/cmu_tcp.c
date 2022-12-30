@@ -53,6 +53,8 @@ int cmu_socket(cmu_socket_t *sock, const cmu_socket_type_t socket_type,
   sock->window.next_seq_expected = 0;
   pthread_mutex_init(&(sock->window.ack_lock), NULL);
 
+  sock->rtt = malloc_rtt_estimator();
+
   if (pthread_cond_init(&sock->wait_cond, NULL) != 0) {
     perror("ERROR condition variable not set\n");
     return EXIT_ERROR;
@@ -121,6 +123,9 @@ int cmu_close(cmu_socket_t *sock) {
     }
     if (sock->sending_buf != NULL) {
       free(sock->sending_buf);
+    }
+    if (sock->rtt != NULL) {
+      free(sock->rtt);
     }
   } else {
     perror("ERROR null socket\n");

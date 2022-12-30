@@ -22,6 +22,7 @@
 
 #include "cmu_packet.h"
 #include "grading.h"
+#include "rtt_estimator.h"
 
 #define EXIT_SUCCESS 0
 #define EXIT_ERROR -1
@@ -61,6 +62,7 @@ typedef struct {
   int dying;
   pthread_mutex_t death_lock;
   window_t window;
+  struct rtt_estimator *rtt;
 } cmu_socket_t;
 
 /*
