@@ -59,9 +59,9 @@ int has_been_acked(cmu_socket_t *sock, uint32_t seq) {
  */
 void handle_message(cmu_socket_t *sock, uint8_t *pkt) {
   cmu_tcp_header_t *hdr = (cmu_tcp_header_t *)pkt;
-  uint8_t flags = get_flags(hdr);
+  uint8_t pkt_flags = get_flags(hdr);
 
-  switch (flags) {
+  switch (pkt_flags) {
     case ACK_FLAG_MASK: {
       uint32_t ack = get_ack(hdr);
       if (after(ack, sock->window.last_ack_received)) {
@@ -69,47 +69,49 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt) {
       }
       break;
     }
-    default: {
-      socklen_t conn_len = sizeof(sock->conn);
-      uint32_t seq = sock->window.last_ack_received;
+  }
 
-      // No payload.
-      uint8_t *payload = NULL;
-      uint16_t payload_len = 0;
+  if (get_payload_len(pkt) == 0)
+    return;
+  
+  socklen_t conn_len = sizeof(sock->conn);
+  uint32_t seq = sock->window.last_ack_received;
 
-      // No extension.
-      uint16_t ext_len = 0;
-      uint8_t *ext_data = NULL;
+  // No payload.
+  uint8_t *payload = NULL;
+  uint16_t payload_len = 0;
 
-      uint16_t src = sock->my_port;
-      uint16_t dst = ntohs(sock->conn.sin_port);
-      uint32_t ack = get_seq(hdr) + get_payload_len(pkt);
-      uint16_t hlen = sizeof(cmu_tcp_header_t);
-      uint16_t plen = hlen + payload_len;
-      uint8_t flags = ACK_FLAG_MASK;
-      uint16_t adv_window = WINDOW_INITIAL_WINDOW_SIZE;
-      uint8_t *response_packet =
-          create_packet(src, dst, seq, ack, hlen, plen, flags, adv_window,
-                        ext_len, ext_data, payload, payload_len);
+  // No extension.
+  uint16_t ext_len = 0;
+  uint8_t *ext_data = NULL;
 
-      sendto(sock->socket, response_packet, plen, 0,
-             (struct sockaddr *)&(sock->conn), conn_len);
-      free(response_packet);
+  uint16_t src = sock->my_port;
+  uint16_t dst = ntohs(sock->conn.sin_port);
+  uint32_t ack = get_seq(hdr) + get_payload_len(pkt);
+  uint16_t hlen = sizeof(cmu_tcp_header_t);
+  uint16_t plen = hlen + payload_len;
+  uint8_t flags = ACK_FLAG_MASK;
+  uint16_t adv_window = WINDOW_INITIAL_WINDOW_SIZE;
+  uint8_t *response_packet =
+      create_packet(src, dst, seq, ack, hlen, plen, flags, adv_window,
+                    ext_len, ext_data, payload, payload_len);
 
-      seq = get_seq(hdr);
+  sendto(sock->socket, response_packet, plen, 0,
+          (struct sockaddr *)&(sock->conn), conn_len);
+  free(response_packet);
 
-      if (seq == sock->window.next_seq_expected) {
-        sock->window.next_seq_expected = seq + get_payload_len(pkt);
-        payload_len = get_payload_len(pkt);
-        payload = get_payload(pkt);
+  seq = get_seq(hdr);
 
-        // Make sure there is enough space in the buffer to store the payload.
-        sock->received_buf =
-            realloc(sock->received_buf, sock->received_len + payload_len);
-        memcpy(sock->received_buf + sock->received_len, payload, payload_len);
-        sock->received_len += payload_len;
-      }
-    }
+  if (seq == sock->window.next_seq_expected) {
+    sock->window.next_seq_expected = seq + get_payload_len(pkt);
+    payload_len = get_payload_len(pkt);
+    payload = get_payload(pkt);
+
+    // Make sure there is enough space in the buffer to store the payload.
+    sock->received_buf =
+        realloc(sock->received_buf, sock->received_len + payload_len);
+    memcpy(sock->received_buf + sock->received_len, payload, payload_len);
+    sock->received_len += payload_len;
   }
 }
 
