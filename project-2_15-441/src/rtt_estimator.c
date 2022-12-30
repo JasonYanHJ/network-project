@@ -1,23 +1,28 @@
 #include "rtt_estimator.h"
 
 #include <stdlib.h>
+#include <stdio.h>
+
+#define abs(X) ((X) >= 0 ? (X) : -(X))
+
+#define A 0.125
+#define B 0.25
+#define U 1
+#define V 4
 
 struct rtt_estimator *malloc_rtt_estimator() {
   struct rtt_estimator *rtt = malloc(sizeof(struct rtt_estimator));
-  for (int i = 0; i < 16; i++)
-    rtt->records_in_us[i] = RTT_INITIAL_IN_MS * 1000;
-  rtt->rtt_in_us = RTT_INITIAL_IN_MS * 1000;
-  rtt->record_cursor = 0;
+  rtt->SRTT = rtt->DevRTT = RTT_INITIAL_IN_MS;
   return rtt;
 }
 
 void update_rtt(struct rtt_estimator *r, struct timeval *start, struct timeval *end) {
-  int interval = (end->tv_sec * 1000000 + end->tv_usec) - (start->tv_sec * 1000000 + start->tv_usec);
-  r->rtt_in_us = r->rtt_in_us - r->records_in_us[r->record_cursor] / 16 + interval / 16;
-  r->records_in_us[r->record_cursor++] = interval;
-  r->record_cursor %= 16;
+  double RTT = ((end->tv_sec * 1000000 + end->tv_usec) - (start->tv_sec * 1000000 + start->tv_usec)) / 1000;
+  r->SRTT = r->SRTT + A * (RTT -  r->SRTT);
+  r->DevRTT = (1 - B) * r->DevRTT + B * abs(RTT - r->SRTT);
 }
 
-int rtt_in_ms(struct rtt_estimator *r) {
-  return r->rtt_in_us / 1000;
+int rto_in_ms(struct rtt_estimator *r) {
+  // printf("RTO: %d\n", (int)(U * r->SRTT + V * r->DevRTT));
+  return (int)(U * r->SRTT + V * r->DevRTT);
 }

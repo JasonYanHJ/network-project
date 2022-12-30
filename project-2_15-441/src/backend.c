@@ -147,8 +147,8 @@ int check_for_data(cmu_socket_t *sock, cmu_read_mode_t flags) {
       struct pollfd ack_fd;
       ack_fd.fd = sock->socket;
       ack_fd.events = POLLIN;
-      // Timeout after RTT * 2.
-      if (poll(&ack_fd, 1, rtt_in_ms(sock->rtt) * 2) <= 0) {
+      // Timeout after RTO.
+      if (poll(&ack_fd, 1, rto_in_ms(sock->rtt)) <= 0) {
         pthread_mutex_unlock(&(sock->recv_lock));
         return -1;
       }
@@ -330,8 +330,8 @@ void send_SYN_ACK(cmu_socket_t *sock) {
   struct pollfd ack_fd;
   ack_fd.fd = sock->socket;
   ack_fd.events = POLLIN;
-  // Timeout after RTT * 2.
-  while (poll(&ack_fd, 1, rtt_in_ms(sock->rtt) * 2) == 0) {
+  // Timeout after RTO.
+  while (poll(&ack_fd, 1, rto_in_ms(sock->rtt)) == 0) {
     sendto(sock->socket, SYN_ACK_packet, plen, 0,
           (struct sockaddr *)&(sock->conn), conn_len);
     printf("TIMEOUT resend SYN_ACK packet\n");

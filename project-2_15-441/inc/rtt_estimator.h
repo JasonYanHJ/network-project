@@ -7,14 +7,13 @@
 
 struct rtt_estimator
 {
-  int records_in_us[16];
-  int record_cursor;
-  int rtt_in_us;
+  double SRTT;
+  double DevRTT;
 };
 
 struct rtt_estimator *malloc_rtt_estimator();
 void update_rtt(struct rtt_estimator *r, struct timeval *start, struct timeval *end);
-int rtt_in_ms(struct rtt_estimator *r);
+int rto_in_ms(struct rtt_estimator *r);
 
 
 #endif  // PROJECT_2_15_441_INC_RTT_ESTIMATOR_H_
