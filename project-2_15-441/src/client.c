@@ -26,6 +26,7 @@ void functionality(cmu_socket_t *sock, int index) {
   int read;
   FILE *fp;
 
+  cmu_write(sock, "start", 6);
 
   switch (index) {
     case 1:
@@ -50,7 +51,6 @@ void functionality(cmu_socket_t *sock, int index) {
       break;
   }
   
-  printf("read %d byte\n", read);
   cmu_write(sock, buf, read);
 }
 

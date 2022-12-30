@@ -35,6 +35,7 @@ int cmu_socket(cmu_socket_t *sock, const cmu_socket_type_t socket_type,
     perror("ERROR opening socket");
     return EXIT_ERROR;
   }
+  sock->ready = 0;
   sock->socket = sockfd;
   sock->received_buf = NULL;
   sock->received_len = 0;
@@ -135,6 +136,8 @@ int cmu_close(cmu_socket_t *sock) {
 }
 
 int cmu_read(cmu_socket_t *sock, void *buf, int length, cmu_read_mode_t flags) {
+  while (!sock->ready) {
+  }
   uint8_t *new_buf;
   int read_len = 0;
 
@@ -184,6 +187,8 @@ int cmu_read(cmu_socket_t *sock, void *buf, int length, cmu_read_mode_t flags) {
 }
 
 int cmu_write(cmu_socket_t *sock, const void *buf, int length) {
+  while (!sock->ready) {
+  }
   while (pthread_mutex_lock(&(sock->send_lock)) != 0) {
   }
   if (sock->sending_buf == NULL)

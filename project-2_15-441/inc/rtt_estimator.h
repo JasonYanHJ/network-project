@@ -3,7 +3,7 @@
 
 #include <sys/time.h>
 
-#define RTT_INITIAL_IN_MS 50
+#define RTT_INITIAL_IN_MS 40
 
 struct rtt_estimator
 {

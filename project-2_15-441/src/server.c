@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "cmu_tcp.h"
 
@@ -33,6 +34,10 @@ void functionality(cmu_socket_t *sock, int index) {
   FILE *fp;
   int read = 0, to_read = 512;
   int n;
+  struct timeval start, end;
+
+  n = cmu_read(sock, buf, BUF_SIZE, NO_FLAG);
+  gettimeofday(&start, NULL);
 
   fp = fopen("/tmp/file.c", "w");
   for (int i = 1; i < index; i++)
@@ -46,7 +51,10 @@ void functionality(cmu_socket_t *sock, int index) {
     }
     read += n;
   }
+  gettimeofday(&end, NULL);
+  int interval = (end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec);
   printf("total read: %d\n", read);
+  printf("time cost: %d ms\n", interval / 1000);
   fclose(fp);
 }
 

@@ -441,6 +441,7 @@ void *begin_backend(void *in) {
   }
   printf("handshake finish successly\n");
   printf("-------------------------------------\n");
+  sock->ready = 1;
 
   while (1) {
     while (pthread_mutex_lock(&(sock->death_lock)) != 0) {
@@ -464,6 +465,7 @@ void *begin_backend(void *in) {
       sock->sending_buf = NULL;
       pthread_mutex_unlock(&(sock->send_lock));
       multi_send(sock, data, buf_len);
+      printf("total send %d bytes\n", buf_len);
       free(data);
     } else {
       pthread_mutex_unlock(&(sock->send_lock));

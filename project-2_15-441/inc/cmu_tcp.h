@@ -48,6 +48,7 @@ typedef enum {
  */
 typedef struct {
   int socket;
+  int ready;
   pthread_t thread_id;
   uint16_t my_port;
   struct sockaddr_in conn;
