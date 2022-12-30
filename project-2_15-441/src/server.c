@@ -46,7 +46,6 @@ void functionality(cmu_socket_t *sock, int index) {
   while (read < to_read) {
     n = cmu_read(sock, buf, BUF_SIZE, NO_WAIT);
     if (n > 0) {
-      printf("N: %d\n", n);
       fwrite(buf, 1, n, fp);
     }
     read += n;
